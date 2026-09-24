@@ -1,5 +1,5 @@
 import express from "express";
-import { prisma } from "../../config/prisma.js";
+import  prisma from "../../config/prisma.js";
 
 const organizationsRouter = express.Router();
 
@@ -12,7 +12,7 @@ organizationsRouter.post("/", async (req, res) => {
       return;
     }
     const slug = name.toLowerCase().replace(/ /g, "-");
-    const organizations = await prisma.organization.create({
+    const organizations = await prisma.organizations.create({
       data: {
         name,
         slug,
@@ -32,7 +32,7 @@ organizationsRouter.get("/:id", async (req, res) => {
       res.status(400).json({ success: false, error: "id is required" });
       return;
     }
-    const organization = await prisma.organization.findUnique({
+    const organization = await prisma.organizations.findUnique({
       where: { id },
     });
     res.status(200).json({ success: true, organization: organization });

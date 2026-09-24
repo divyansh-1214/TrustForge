@@ -1,5 +1,5 @@
 import express from "express";
-import { prisma } from "../../config/prisma.js";
+import  prisma  from "../../config/prisma.js";
 import bcrypt from "bcrypt";
 const usersRouter = express.Router();
 
@@ -23,24 +23,25 @@ usersRouter.post(
   },
   async (req, res) => {
     try {
-      const { maill, password, name } = req.body;
-      if (maill === undefined) {
-        res.status(400).json({ success: false, error: "maill is required" });
+      const { email, password, name } = req.body;
+      if (email === undefined) {
+        res.status(400).json({ success: false, error: "email is required" });
         return;
       }
       if (name === undefined) {
         res.status(400).json({ success: false, error: "name is required" });
         return;
       }
-      const user = await prisma.user.create({
+      const user = await prisma.users.create({
         data: {
-          maill: maill,
-          password: password,
+          email: email,
+          password_hash: password,
           name: name,
         },
       });
       res.status(200).json({ success: true, user: user });
     } catch (error) {
+      console.log(error);
       res.status(500).json({ success: false, error: error });
     }
   },
@@ -54,7 +55,7 @@ usersRouter.get("/:id", async (req, res) => {
       res.status(400).json({ success: false, error: "id is required" });
       return;
     }
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: {
         id: id,
       },

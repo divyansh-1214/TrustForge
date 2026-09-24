@@ -1,12 +1,12 @@
 import express from "express";
-import { prisma } from "../../config/prisma.js";
+import  prisma  from "../../config/prisma.js";
 const membersRouter = express.Router();
 
 membersRouter.post("/", async (req, res) => {
   try {
     const { organization_id, user_id, role } = req.body;
 
-    const member = await prisma.member.create({
+    const member = await prisma.members.create({
       data: {
         organization_id,
         user_id,
@@ -26,8 +26,8 @@ membersRouter.get("/:id", async (req, res) => {
       res.status(400).json({ success: false, error: "id is required" });
       return;
     }
-    const member = await prisma.member.findUnique({
-      where: { id: parseInt(id) },
+    const member = await prisma.members.findUnique({
+      where: { id: id },
     });
     if (member === null) {
       res.status(404).json({ success: false, error: "member not found" });
@@ -41,7 +41,7 @@ membersRouter.get("/:id", async (req, res) => {
 
 membersRouter.get("/", async (req, res) => {
   try {
-    const members = await prisma.member.findMany();
+    const members = await prisma.members.findMany();
     res.status(200).json({ success: true, members });
   } catch (error) {
     res.status(500).json({ success: false, error: error });
