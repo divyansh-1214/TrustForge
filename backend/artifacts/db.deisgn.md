@@ -34,6 +34,7 @@ erDiagram
         uuid id PK
         text email
         text password_hash
+        text name
     }
     MEMBERS {
         uuid id PK
@@ -120,4 +121,27 @@ erDiagram
         numeric cost
         enum status
     }
+```
+
+
+``` 
+https://api.yourapp.com/v1
+│
+├── /organizations
+│
+├── /organizations/{slug}
+│   ├── /members
+│   ├── /api-keys
+│   ├── /usage
+│   └── /models
+│
+├── /providers
+│
+├── /models
+│
+├── /routing-rules
+│
+├── /guardrail-policies
+│
+└── /usage-logs
 ```

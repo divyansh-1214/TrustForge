@@ -23,15 +23,20 @@ usersRouter.post(
   },
   async (req, res) => {
     try {
-      const { maill, password } = req.body;
+      const { maill, password, name } = req.body;
       if (maill === undefined) {
         res.status(400).json({ success: false, error: "maill is required" });
+        return;
+      }
+      if (name === undefined) {
+        res.status(400).json({ success: false, error: "name is required" });
         return;
       }
       const user = await prisma.user.create({
         data: {
           maill: maill,
           password: password,
+          name: name,
         },
       });
       res.status(200).json({ success: true, user: user });

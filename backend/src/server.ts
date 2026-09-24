@@ -8,9 +8,9 @@ import usersRouter from './feature/users/users.routes.js';
 config();
 const app = express();
 app.use(express.json());
-app.use('/members', membersRouter);
-app.use('/organizations', organizationsRouter);
-app.use('/users', usersRouter);
+app.use('/v1/members', membersRouter);
+app.use('/v1/organizations', organizationsRouter);
+app.use('/v1/users', usersRouter);
 
 app.get('/', (req, res) => {
   res.send('Hello, World!');
