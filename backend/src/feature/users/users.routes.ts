@@ -47,6 +47,16 @@ usersRouter.post(
   },
 );
 
+usersRouter.get("/", async (req, res) => {
+  try {
+    const users = await prisma.users.findMany();
+    res.status(200).json({ success: true, users: users });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, error: error });
+  }
+})
+
 // for geting the user by there id
 usersRouter.get("/:id", async (req, res) => {
   try {
