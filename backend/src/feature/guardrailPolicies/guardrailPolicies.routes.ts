@@ -70,11 +70,32 @@ guardrailPoliciesRouter.post("/", async (req, res) => {
 
 guardrailPoliciesRouter.get("/", async (req, res) => {
   try {
-    const guardrailPolicies = await prisma.guardrail_policies.findMany();
+    const organization_id = req.query.organization_id as string;
+    const guardrailPolicies = await prisma.guardrail_policies.findMany({
+      where: { organization_id },
+    });
     res.status(200).json({ success: true, guardrailPolicies });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, error: "failed to fetch guardrail policies" });
   }
 });
+
+guardrailPoliciesRouter.get("/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const guardrailPolicy = await prisma.guardrail_policies.findUnique({
+      where: { id },
+    });
+    if (!guardrailPolicy) {
+      res.status(404).json({ success: false, error: "guardrail policy not found" });
+      return;
+    }
+    res.status(200).json({ success: true, guardrailPolicy: guardrailPolicy });
+  } catch(error) {
+    console.log(error)
+  }
+})
+
+
 export default guardrailPoliciesRouter;
