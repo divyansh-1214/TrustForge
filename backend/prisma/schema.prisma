@@ -17,15 +17,22 @@ model members {
   users           users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([organization_id, user_id])
+  @@index([organization_id], map: "idx_members_org")
+  @@index([user_id], map: "idx_members_user")
 }
 
 model organizations {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name       String
-  slug       String    @unique
-  created_at DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at DateTime  @default(now()) @db.Timestamptz(6)
-  members    members[]
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String
+  slug               String               @unique
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  api_keys           api_keys[]
+  guardrail_policies guardrail_policies[]
+  members            members[]
+  projects           projects[]
+  routing_rules      routing_rules[]
+  usage_logs         usage_logs[]
 }
 
 model users {
@@ -38,9 +45,210 @@ model users {
   members       members[]
 }
 
+model models {
+  id                                                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider_id                                           String            @db.Uuid
+  name                                                  String
+  model_identifier                                      String
+  context_window                                        Int
+  input_cost_per_1m                                     Decimal           @db.Decimal(10, 4)
+  output_cost_per_1m                                    Decimal           @db.Decimal(10, 4)
+  capabilities                                          Json              @default("{}")
+  status                                                model_status      @default(active)
+  created_at                                            DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at                                            DateTime          @default(now()) @db.Timestamptz(6)
+  providers                                             providers         @relation(fields: [provider_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  provider_models                                       provider_models[]
+  routing_rules_routing_rules_fallback_model_idTomodels routing_rules[]   @relation("routing_rules_fallback_model_idTomodels")
+  routing_rules_routing_rules_target_model_idTomodels   routing_rules[]   @relation("routing_rules_target_model_idTomodels")
+  usage_logs                                            usage_logs[]
+
+  @@unique([provider_id, model_identifier])
+  @@index([provider_id], map: "idx_models_provider")
+}
+
+model projects {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id    String               @db.Uuid
+  name               String
+  slug               String
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  api_keys           api_keys[]
+  guardrail_policies guardrail_policies[]
+  organizations      organizations        @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  routing_rules      routing_rules[]
+  usage_logs         usage_logs[]
+
+  @@unique([organization_id, slug])
+  @@index([organization_id], map: "idx_projects_org")
+}
+
+model provider_models {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alias       String
+  model_id    String   @db.Uuid
+  priority    Int      @default(0)
+  is_fallback Boolean  @default(false)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  models      models   @relation(fields: [model_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([alias, model_id])
+  @@index([alias], map: "idx_provider_models_alias")
+}
+
+model providers {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String          @unique
+  base_url          String
+  api_key_encrypted String
+  status            provider_status @default(active)
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime        @default(now()) @db.Timestamptz(6)
+  models            models[]
+  usage_logs        usage_logs[]
+}
+
+model api_keys {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id    String         @db.Uuid
+  project_id         String?        @db.Uuid
+  key_hash           String         @unique
+  key_prefix         String
+  name               String?
+  permissions        Json           @default("{}")
+  rate_limit_per_min Int            @default(60)
+  last_used_at       DateTime?      @db.Timestamptz(6)
+  expires_at         DateTime?      @db.Timestamptz(6)
+  status             api_key_status @default(active)
+  created_at         DateTime       @default(now()) @db.Timestamptz(6)
+  organizations      organizations  @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  projects           projects?      @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usage_logs         usage_logs[]
+
+  @@index([key_hash], map: "idx_api_keys_hash")
+  @@index([organization_id], map: "idx_api_keys_org")
+  @@index([project_id], map: "idx_api_keys_project")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model guardrail_events {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  request_id          String              @db.Uuid
+  guardrail_policy_id String?             @db.Uuid
+  stage               String
+  rule_triggered      String
+  action              guardrail_action
+  detail              Json                @default("{}")
+  created_at          DateTime            @default(now()) @db.Timestamptz(6)
+  guardrail_policies  guardrail_policies? @relation(fields: [guardrail_policy_id], references: [id], onUpdate: NoAction)
+
+  @@index([request_id], map: "idx_guardrail_events_request")
+}
+
+model guardrail_policies {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id  String             @db.Uuid
+  project_id       String?            @db.Uuid
+  name             String
+  enabled          Boolean            @default(true)
+  rules            Json               @default("{}")
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
+  guardrail_events guardrail_events[]
+  organizations    organizations      @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  projects         projects?          @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([organization_id], map: "idx_guardrail_policies_org")
+}
+
+model routing_rules {
+  id                                             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id                                String        @db.Uuid
+  project_id                                     String?       @db.Uuid
+  name                                           String
+  conditions                                     Json          @default("{}")
+  target_model_id                                String?       @db.Uuid
+  fallback_model_id                              String?       @db.Uuid
+  priority                                       Int           @default(0)
+  enabled                                        Boolean       @default(true)
+  created_at                                     DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at                                     DateTime      @default(now()) @db.Timestamptz(6)
+  models_routing_rules_fallback_model_idTomodels models?       @relation("routing_rules_fallback_model_idTomodels", fields: [fallback_model_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations                                  organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  projects                                       projects?     @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  models_routing_rules_target_model_idTomodels   models?       @relation("routing_rules_target_model_idTomodels", fields: [target_model_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([organization_id], map: "idx_routing_rules_org")
+  @@index([project_id], map: "idx_routing_rules_project")
+}
+
+model usage_logs {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  request_id      String         @db.Uuid
+  organization_id String         @db.Uuid
+  project_id      String?        @db.Uuid
+  api_key_id      String?        @db.Uuid
+  model_id        String?        @db.Uuid
+  provider_id     String?        @db.Uuid
+  requested_alias String?
+  input_tokens    Int            @default(0)
+  output_tokens   Int            @default(0)
+  total_tokens    Int?           @default(dbgenerated("(input_tokens + output_tokens)"))
+  latency_ms      Int?
+  cost            Decimal        @default(0) @db.Decimal(12, 6)
+  status          request_status
+  error_message   String?
+  created_at      DateTime       @default(now()) @db.Timestamptz(6)
+  api_keys        api_keys?      @relation(fields: [api_key_id], references: [id], onUpdate: NoAction)
+  models          models?        @relation(fields: [model_id], references: [id], onUpdate: NoAction)
+  organizations   organizations  @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  projects        projects?      @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  providers       providers?     @relation(fields: [provider_id], references: [id], onUpdate: NoAction)
+
+  @@index([model_id], map: "idx_usage_logs_model")
+  @@index([organization_id, created_at(sort: Desc)], map: "idx_usage_logs_org_created")
+  @@index([project_id, created_at(sort: Desc)], map: "idx_usage_logs_project_created")
+  @@index([provider_id], map: "idx_usage_logs_provider")
+  @@index([request_id], map: "idx_usage_logs_request")
+}
+
 enum member_role {
   owner
   admin
   developer
   viewer
+}
+
+enum model_status {
+  active
+  deprecated
+  disabled
+}
+
+enum provider_status {
+  active
+  disabled
+  degraded
+}
+
+enum api_key_status {
+  active
+  revoked
+  expired
+}
+
+enum guardrail_action {
+  allow
+  block
+  redact
+  flag
+}
+
+enum request_status {
+  success
+  error
+  blocked
+  rate_limited
+  fallback_used
 }
