@@ -6,6 +6,7 @@ import organizationsRouter from './feature/organizations/organizations.routes.js
 import usersRouter from './feature/users/users.routes.js';
 import productsRouter from './feature/projects/projects.routes.js';
 import guardrailPoliciesRouter from './feature/guardrailPolicies/guardrailPolicies.routes.js';
+import guardrailDetectionRulesRouter from './feature/guardrailDetectionRules/guardrailDetectionRules.routes.js';
 
 config();
 const frontendUrl = process.env.FRONTEND_URL;
@@ -17,6 +18,7 @@ app.use('/v1/organizations', organizationsRouter);
 app.use('/v1/users', usersRouter);
 app.use('/v1/products', productsRouter);
 app.use('/v1/guardrail-policies', guardrailPoliciesRouter);
+app.use('/v1/guardrail-detection-rules', guardrailDetectionRulesRouter);
 
 app.get('/', (req, res) => {
   res.json({success: true, message: 'server is running'})
