@@ -1,3 +1,4 @@
+import type { Prisma } from "../../generated/prisma/client.js";
 type GuardrailRuleInput = {
   type: string;
   name: string;

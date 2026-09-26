@@ -1,5 +1,4 @@
 import express from "express";
-import type { Prisma } from "../../generated/prisma/client.js";
 import prisma from "../../config/prisma.js";
 import { isRecord,isGuardrailRule, isGuardrailRuleArray } from "./guardrailPolicies.services.js";
 
