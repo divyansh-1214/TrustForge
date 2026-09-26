@@ -2,9 +2,12 @@
 
 ```mermaid
 erDiagram
+
     ORGANIZATIONS ||--o{ MEMBERS : has
     USERS ||--o{ MEMBERS : has
+
     ORGANIZATIONS ||--o{ PROJECTS : has
+
     ORGANIZATIONS ||--o{ API_KEYS : has
     PROJECTS ||--o{ API_KEYS : scopes
 
@@ -17,7 +20,13 @@ erDiagram
 
     ORGANIZATIONS ||--o{ GUARDRAIL_POLICIES : defines
     PROJECTS ||--o{ GUARDRAIL_POLICIES : scopes
+
+    GUARDRAIL_POLICIES ||--o{ GUARDRAIL_DETECTION_RULES : contains
+    GUARDRAIL_POLICIES ||--o{ GUARDRAIL_TRANSFORMATION_RULES : contains
+
     GUARDRAIL_POLICIES ||--o{ GUARDRAIL_EVENTS : triggers
+    GUARDRAIL_DETECTION_RULES ||--o{ GUARDRAIL_EVENTS : triggers
+    GUARDRAIL_TRANSFORMATION_RULES ||--o{ GUARDRAIL_EVENTS : triggers
 
     ORGANIZATIONS ||--o{ USAGE_LOGS : accrues
     PROJECTS ||--o{ USAGE_LOGS : accrues
@@ -25,29 +34,41 @@ erDiagram
     MODELS ||--o{ USAGE_LOGS : consumed_via
     PROVIDERS ||--o{ USAGE_LOGS : billed_via
 
+
     ORGANIZATIONS {
         uuid id PK
         text name
         text slug
+        timestamp created_at
+        timestamp updated_at
     }
+
     USERS {
         uuid id PK
         text email
         text password_hash
         text name
+        timestamp created_at
+        timestamp updated_at
     }
+
     MEMBERS {
         uuid id PK
         uuid organization_id FK
         uuid user_id FK
         enum role
+        timestamp created_at
     }
+
     PROJECTS {
         uuid id PK
         uuid organization_id FK
         text name
         text slug
+        timestamp created_at
+        timestamp updated_at
     }
+
     PROVIDERS {
         uuid id PK
         text name
@@ -55,6 +76,7 @@ erDiagram
         text api_key_encrypted
         enum status
     }
+
     MODELS {
         uuid id PK
         uuid provider_id FK
@@ -66,6 +88,7 @@ erDiagram
         jsonb capabilities
         enum status
     }
+
     PROVIDER_MODELS {
         uuid id PK
         text alias
@@ -73,6 +96,7 @@ erDiagram
         int priority
         bool is_fallback
     }
+
     ROUTING_RULES {
         uuid id PK
         uuid organization_id FK
@@ -83,22 +107,61 @@ erDiagram
         uuid fallback_model_id FK
         bool enabled
     }
+
+
     GUARDRAIL_POLICIES {
         uuid id PK
         uuid organization_id FK
         uuid project_id FK
         text name
-        jsonb rules
+        text description
         bool enabled
+        timestamp created_at
+        timestamp updated_at
     }
+
+    GUARDRAIL_DETECTION_RULES {
+        uuid id PK
+        uuid policy_id FK
+        text name
+        enum type
+        enum action
+        bool enabled
+        numeric threshold
+        jsonb config
+        int priority
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    GUARDRAIL_TRANSFORMATION_RULES {
+        uuid id PK
+        uuid policy_id FK
+        text name
+        enum type
+        enum action
+        bool enabled
+        jsonb config
+        int priority
+        timestamp created_at
+        timestamp updated_at
+    }
+
     GUARDRAIL_EVENTS {
         uuid id PK
         uuid request_id
         uuid guardrail_policy_id FK
+        uuid detection_rule_id FK
+        uuid transformation_rule_id FK
         text stage
-        text rule_triggered
+        text rule_type
+        text rule_name
         enum action
+        jsonb metadata
+        timestamp created_at
     }
+
+
     API_KEYS {
         uuid id PK
         uuid organization_id FK
@@ -107,7 +170,10 @@ erDiagram
         text key_prefix
         int rate_limit_per_min
         enum status
+        timestamp created_at
+        timestamp expires_at
     }
+
     USAGE_LOGS {
         uuid id PK
         uuid request_id
@@ -120,11 +186,11 @@ erDiagram
         int output_tokens
         numeric cost
         enum status
+        timestamp created_at
     }
 ```
 
-
-``` 
+```
 https://api.yourapp.com/v1
 │
 ├── /organizations
