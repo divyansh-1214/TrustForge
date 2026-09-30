@@ -3,6 +3,8 @@ import os
 from dotenv import load_dotenv
 from groq import Groq
 
+from ..schemas import SafetyRule
+
 load_dotenv()
 
 
@@ -19,7 +21,13 @@ client = Groq(api_key=GROQ_API_KEY)
 MODEL_NAME = os.getenv("MODEL_NAME")
 
 
-def classify_safety(masked_text: str) -> str:
+def classify_safety(test: str, rules: list[SafetyRule]) -> str:
+    print(rules)
+    rulesName = [];
+    configs = list[dict[any, any]];
+    for rule in rules:
+        rulesName.append(rule.name);
+
 
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -36,9 +44,9 @@ def classify_safety(masked_text: str) -> str:
                     "personal information."
                 ),
             },
-            {"role": "user", "content": masked_text},
+            {"role": "user", "content": test},
         ],
         reasoning_effort="low",
     )
 
-    return response.choices[0].message.content
+    return "heyyy"

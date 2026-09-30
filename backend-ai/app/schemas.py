@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -18,5 +20,18 @@ class MaskResponse(BaseModel):
     entities: list[EntityResponse]
 
 
+class SafetyRule(BaseModel):
+    id: str
+    policy_id: str
+    type: str
+    name: str
+    action: str
+    enabled: bool
+    threshold: float | None = None
+    config: dict[str, Any]
+    priority: int
+
+
 class SafetyRequest(BaseModel):
-    text: str
+    prompt: str
+    rules: list[SafetyRule]

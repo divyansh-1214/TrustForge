@@ -1,0 +1,24 @@
+[project]
+name = "backend-ai"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "langchain",
+    "langgraph",
+    "groq",
+    "presidio-analyzer",
+    "presidio-anonymizer",
+    "spacy",
+    "en-core-web-lg",
+    "python-dotenv",
+    "phonenumbers",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+en-core-web-lg = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" }

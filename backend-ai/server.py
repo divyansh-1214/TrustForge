@@ -1,9 +1,15 @@
+import json
+from pprint import pprint
+from typing import Any
+from unittest import result
+
 from app.detector.presidio_detector import detect_presidio
 from app.detector.regex_detector import detect_regex
 from app.masking.masker import mask_text, merge_entities, unmask_text
-from app.schemas import MaskRequest, MaskResponse, SafetyRequest
+from app.schemas import MaskRequest, MaskResponse, SafetyRequest, SafetyRule
 from app.services.groq_service import classify_safety
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="TrustForge PII Engine",
@@ -11,22 +17,28 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Temporary in-memory storage for prototype.
-# Later this should be replaced with a secure
-# local vault/session-based store.
+
 mapping_store: dict[str, dict] = {}
 
 
 @app.get("/")
 def root():
-
     return {"service": "TrustForge PII Engine", "status": "running"}
 
 
 @app.get("/health")
 def health():
-
     return {"status": "healthy"}
 
 
@@ -38,19 +50,14 @@ def mask(request: MaskRequest):
     if not text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
 
-    # Detector 1
     regex_entities = detect_regex(text)
 
-    # Detector 2
     presidio_entities = detect_presidio(text)
 
-    # Combine both detectors
     entities = merge_entities(regex_entities, presidio_entities)
 
-    # Mask PII locally
     masked_text, mapping = mask_text(text, entities)
 
-    # Generate an ID for this masking operation
     request_id = str(len(mapping_store) + 1)
 
     mapping_store[request_id] = mapping
@@ -74,11 +81,14 @@ def unmask(request_id: str, text: str):
 @app.post("/safety")
 def safety(request: SafetyRequest):
 
-    if not request.text.strip():
-        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    if not request.prompt:
+        raise HTTPException(status_code=400, detail="promt array cannot be empty")
 
-    # IMPORTANT:
-    # This endpoint expects ALREADY MASKED text.
-    result = classify_safety(request.text)
+    if not request.rules:
+        raise HTTPException(status_code=400, detail="Rules array cannot be empty")
 
-    return {"result": result}
+    rules = sorted(request.rules, key=lambda rule: rule.priority)
+    # result = classify_safety(request.prompt, rules)
+    print(request)
+
+    return {"success": True, "rules": rules}
