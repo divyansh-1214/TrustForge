@@ -1,13 +1,17 @@
 import express from "express";
 import prisma from "../../config/prisma.js";
-import { isRecord,isGuardrailRule, isGuardrailRuleArray } from "./guardrailPolicies.services.js";
+import { isGuardrailRuleArray, isRecord } from "./guardrailPolicies.services.js";
+import {
+  isNonEmptyString,
+  isUuid,
+  sendDatabaseError,
+} from "../api.helpers.js";
 
 const guardrailPoliciesRouter = express.Router();
 
 guardrailPoliciesRouter.post("/", async (req, res) => {
   if (!isRecord(req.body)) {
-    res.status(400).json({ success: false, error: "request body must be a JSON object" });
-    return;
+    return res.status(400).json({ success: false, error: "request body must be a JSON object" });
   }
 
   const {
@@ -20,72 +24,57 @@ guardrailPoliciesRouter.post("/", async (req, res) => {
     guardrail_transformation_rules,
   } = req.body;
 
-  if (typeof organization_id !== "string" || organization_id.trim() === "") {
-    res.status(400).json({ success: false, error: "organization_id is required" });
-    return;
+  if (!isUuid(organization_id) || !isUuid(project_id)) {
+    return res.status(400).json({
+      success: false,
+      error: "valid organization_id and project_id are required",
+    });
   }
-
-  if (typeof name !== "string" || name.trim() === "") {
-    res.status(400).json({ success: false, error: "name is required" });
-    return;
+  if (!isNonEmptyString(name)) {
+    return res.status(400).json({ success: false, error: "name is required" });
   }
-
   if (description !== undefined && description !== null && typeof description !== "string") {
-    res.status(400).json({
-      success: false,
-      error: "description must be a string or null",
-    });
-    return;
+    return res.status(400).json({ success: false, error: "description must be a string or null" });
   }
-
   if (enabled !== undefined && typeof enabled !== "boolean") {
-    res.status(400).json({
-      success: false,
-      error: "enabled must be a boolean",
-    });
-    return;
+    return res.status(400).json({ success: false, error: "enabled must be a boolean" });
   }
-
-  if (
-    project_id !== undefined &&
-    project_id !== null &&
-    (typeof project_id !== "string" || project_id.trim() === "")
-  ) {
-    res.status(400).json({
-      success: false,
-      error: "project_id must be a non-empty string or null",
-    });
-    return;
-  }
-
   if (
     guardrail_detection_rules !== undefined &&
     !isGuardrailRuleArray(guardrail_detection_rules)
   ) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       error: "guardrail_detection_rules must be an array of valid detection rules",
     });
-    return;
   }
-
   if (
     guardrail_transformation_rules !== undefined &&
     (!isGuardrailRuleArray(guardrail_transformation_rules) ||
       guardrail_transformation_rules.some((rule) => rule.threshold !== undefined))
   ) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
-      error: "guardrail_transformation_rules must be an array of valid transformation rules without threshold",
+      error: "guardrail_transformation_rules must be valid transformation rules without threshold",
     });
-    return;
   }
 
   try {
+    const project = await prisma.projects.findUnique({
+      where: { id: project_id },
+      select: { organization_id: true },
+    });
+    if (!project || project.organization_id !== organization_id) {
+      return res.status(400).json({
+        success: false,
+        error: "project must belong to the specified organization",
+      });
+    }
+
     const guardrailPolicy = await prisma.guardrail_policies.create({
       data: {
         organization_id,
-        project_id: project_id ?? null,
+        project_id,
         name: name.trim(),
         ...(description !== undefined && { description }),
         ...(enabled !== undefined && { enabled }),
@@ -120,43 +109,116 @@ guardrailPoliciesRouter.post("/", async (req, res) => {
         guardrail_transformation_rules: true,
       },
     });
-
-    res.status(201).json({ success: true, guardrailPolicy });
+    return res.status(201).json({ success: true, guardrailPolicy });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, error: "failed to create guardrail policy" });
+    return sendDatabaseError(res, error, "failed to create guardrail policy");
   }
 });
 
-
 guardrailPoliciesRouter.get("/", async (req, res) => {
+  const organizationId = req.query.organization_id;
+  const projectId = req.query.project_id;
+  if (
+    (organizationId !== undefined && !isUuid(organizationId)) ||
+    (projectId !== undefined && !isUuid(projectId))
+  ) {
+    return res.status(400).json({ success: false, error: "filters must be valid UUIDs" });
+  }
+
   try {
-    const organization_id = req.query.organization_id as string;
     const guardrailPolicies = await prisma.guardrail_policies.findMany({
-      where: { organization_id },
+      where: {
+        ...(organizationId && { organization_id: organizationId }),
+        ...(projectId && { project_id: projectId }),
+      },
+      include: {
+        guardrail_detection_rules: true,
+        guardrail_transformation_rules: true,
+      },
     });
-    res.status(200).json({ success: true, guardrailPolicies });
+    return res.json({ success: true, guardrailPolicies });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, error: "failed to fetch guardrail policies" });
+    return sendDatabaseError(res, error, "failed to fetch guardrail policies");
   }
 });
 
 guardrailPoliciesRouter.get("/:id", async (req, res) => {
+  const { id } = req.params;
+  if (!isUuid(id)) {
+    return res.status(400).json({ success: false, error: "id must be a valid UUID" });
+  }
+
   try {
-    const id = req.params.id;
     const guardrailPolicy = await prisma.guardrail_policies.findUnique({
       where: { id },
+      include: {
+        organizations: true,
+        projects: true,
+        guardrail_detection_rules: true,
+        guardrail_transformation_rules: true,
+        guardrail_events: true,
+      },
     });
     if (!guardrailPolicy) {
-      res.status(404).json({ success: false, error: "guardrail policy not found" });
-      return;
+      return res.status(404).json({ success: false, error: "guardrail policy not found" });
     }
-    res.status(200).json({ success: true, guardrailPolicy: guardrailPolicy });
-  } catch(error) {
-    console.log(error)
+    return res.json({ success: true, guardrailPolicy });
+  } catch (error) {
+    return sendDatabaseError(res, error, "failed to fetch guardrail policy");
   }
-})
+});
 
+guardrailPoliciesRouter.patch("/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, description, enabled } = req.body;
+  if (!isUuid(id)) {
+    return res.status(400).json({ success: false, error: "id must be a valid UUID" });
+  }
+  if (
+    (name !== undefined && !isNonEmptyString(name)) ||
+    (description !== undefined && description !== null && typeof description !== "string") ||
+    (enabled !== undefined && typeof enabled !== "boolean") ||
+    (name === undefined && description === undefined && enabled === undefined)
+  ) {
+    return res.status(400).json({ success: false, error: "no valid policy fields supplied" });
+  }
+
+  try {
+    const guardrailPolicy = await prisma.guardrail_policies.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name: name.trim() }),
+        ...(description !== undefined && { description }),
+        ...(enabled !== undefined && { enabled }),
+      },
+      include: {
+        guardrail_detection_rules: true,
+        guardrail_transformation_rules: true,
+      },
+    });
+    return res.json({ success: true, guardrailPolicy });
+  } catch (error) {
+    return sendDatabaseError(res, error, "failed to update guardrail policy");
+  }
+});
+
+guardrailPoliciesRouter.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  if (!isUuid(id)) {
+    return res.status(400).json({ success: false, error: "id must be a valid UUID" });
+  }
+
+  try {
+    await prisma.$transaction(async (transaction) => {
+      await transaction.guardrail_events.deleteMany({ where: { guardrail_policy_id: id } });
+      await transaction.guardrail_detection_rules.deleteMany({ where: { policy_id: id } });
+      await transaction.guardrail_transformation_rules.deleteMany({ where: { policy_id: id } });
+      await transaction.guardrail_policies.delete({ where: { id } });
+    });
+    return res.status(204).end();
+  } catch (error) {
+    return sendDatabaseError(res, error, "failed to delete guardrail policy");
+  }
+});
 
 export default guardrailPoliciesRouter;

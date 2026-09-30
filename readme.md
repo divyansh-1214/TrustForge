@@ -64,25 +64,51 @@ npx prisma validate
 
 ### API overview
 
-The current Express routes include:
+The Express API exposes these resource routes:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/` | API health message |
-| `POST`, `GET` | `/v1/users` | Create/list users |
-| `GET` | `/v1/users/:id` | Get one user |
-| `POST` | `/v1/organizations` | Create an organization |
-| `GET` | `/v1/organizations/:id` | Get one organization |
-| `POST`, `GET` | `/v1/members` | Create/list organization members |
-| `GET` | `/v1/members/:id` | Get one member |
-| `POST`, `GET` | `/v1/products` | Create/list projects |
-| `POST`, `GET` | `/v1/guardrail-policies` | Create/list guardrail policies |
-| `GET` | `/v1/guardrail-policies/:id` | Get one guardrail policy |
-| `GET`, `POST` | `/v1/guardrail-detection-rules` | List policy rules or forward a prompt to the AI service |
+| `GET`, `POST` | `/v1/organizations` | List/create organizations |
+| `GET`, `PATCH`, `DELETE` | `/v1/organizations/:id` | Read/update/delete an organization |
+| `GET`, `POST` | `/v1/users` | List/create users |
+| `GET`, `PATCH`, `DELETE` | `/v1/users/:id` | Read/update/delete a user |
+| `GET`, `POST` | `/v1/members` | List/create organization memberships |
+| `GET`, `PATCH`, `DELETE` | `/v1/members/:id` | Read/update/remove a membership |
+| `GET`, `POST` | `/v1/projects` and `/v1/products` | List/create projects |
+| `GET`, `PATCH`, `DELETE` | `/v1/projects/:id` and `/v1/products/:id` | Read/update/delete a project |
+| `GET`, `POST` | `/v1/providers`, `/v1/models`, `/v1/provider-models` | Manage providers, models, and model aliases |
+| `GET`, `PATCH`, `DELETE` | `/:id` under those provider/model routes | Read/update/delete the selected resource |
+| `GET`, `POST` | `/v1/routing-rules` | List/create project routing rules |
+| `GET`, `PATCH`, `DELETE` | `/v1/routing-rules/:id` | Read/update/delete a routing rule |
+| `GET`, `POST` | `/v1/api-keys` | List/create organization or project API keys |
+| `GET`, `PATCH`, `DELETE` | `/v1/api-keys/:id` | Read/update/revoke an API key |
+| `POST`, `GET` | `/v1/guardrail-policies` | Create/list policies |
+| `GET`, `PATCH`, `DELETE` | `/v1/guardrail-policies/:id` | Read/update/delete a policy and its child rules/events |
+| `GET`, `POST` | `/v1/guardrail-detection-rules` | List policy rules or send a prompt to the AI safety service |
+| `POST` | `/v1/guardrail-detection-rules/rules` | Create a detection rule |
+| `PATCH`, `DELETE` | `/v1/guardrail-detection-rules/rules/:id` | Update/delete a detection rule |
+| `GET`, `POST` | `/v1/guardrail-transformation-rules` | List/create transformation rules |
+| `GET`, `PATCH`, `DELETE` | `/v1/guardrail-transformation-rules/:id` | Read/update/delete a transformation rule |
+| `GET`, `POST` | `/v1/guardrail-events` | Query/create immutable guardrail events |
+| `GET`, `POST` | `/v1/usage-logs` | Query/create immutable usage logs |
+| `GET` | `/v1/usage-logs/:id`, `/v1/guardrail-events/:id` | Read a single usage log or guardrail event |
+| `POST` | `/v1/classify` | Classify text using enabled rules for a policy |
 
-Projects are exposed as `/v1/products` by the current server route. Policy list
-requests accept `organization_id` as a query parameter. Detection-rule requests
-accept `policy_id` as a query parameter.
+List endpoints accept relevant relationship filters such as `organization_id`,
+`project_id`, `policy_id`, `provider_id`, and `user_id`. UUID path and relation
+identifiers are validated. Project-bound policies, routing rules, and API keys
+are checked against their organization; usage logs also validate their
+organization/project/API-key/model relationships. User responses never include
+password hashes, and API-key hashes are never returned. A newly created API key
+is returned once in plaintext; deleting a key revokes it rather than removing
+the audit record.
+
+The Prisma schema requires a project for each guardrail policy and permits only
+one policy per project. Use an existing project UUID when creating a policy.
+The `/v1/products` path remains available as a compatibility alias for projects.
+Set `AI_SERVICE_URL` to override the default safety-service URL
+`http://127.0.0.1:8000`.
 
 Example policy creation request:
 
@@ -113,10 +139,8 @@ Content-Type: application/json
 }
 ```
 
-The organization and project UUIDs must refer to existing records. In the
-current Prisma schema, `project_id` is required and unique for a guardrail
-policy, even though the API input validation accepts `null`; use a project UUID
-for successful creation.
+The organization and project UUIDs must refer to existing records, and the
+project must belong to the specified organization.
 
 ## 2. AI service
 
