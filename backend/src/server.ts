@@ -16,6 +16,8 @@ import routingRulesRouter from './feature/routingRules/routingRules.routes.js';
 import apiKeysRouter from './feature/apiKeys/apiKeys.routes.js';
 import usageLogsRouter from './feature/usageLogs/usageLogs.routes.js';
 import classifyRoutes from './feature/classify/classify.routes.js';
+import swaggerUi from 'swagger-ui-express';
+import openApiSpec from './openapi.js';
 
 config();
 const frontendUrl = process.env.FRONTEND_URL;
@@ -38,6 +40,18 @@ app.use('/v1/routing-rules', routingRulesRouter);
 app.use('/v1/api-keys', apiKeysRouter);
 app.use('/v1/usage-logs', usageLogsRouter);
 app.use('/v1/classify', classifyRoutes);
+app.get('/docs/openapi.json', (_req, res) => {
+  res.json(openApiSpec);
+});
+app.use(
+  '/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(openApiSpec, {
+    explorer: true,
+    customSiteTitle: 'TrustForge Backend API',
+    swaggerOptions: { persistAuthorization: true },
+  }),
+);
 
 app.get('/', (req, res) => {
   res.json({success: true, message: 'server is running'})
